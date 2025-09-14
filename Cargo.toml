@@ -23,3 +23,5 @@ env_logger = "0.10"
 hex = "0.4"
 # For collections
 indexmap = "2.0"
+# For CLI interface
+clap = { version = "4.0", features = ["derive"] }
