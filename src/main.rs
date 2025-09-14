@@ -36,6 +36,12 @@ fn main() {
             println!("Execution successful: {}", result.success);
             println!("Gas used: {}", result.gas_used);
             println!("Gas remaining: {}", result.gas_remaining);
+            if !result.logs.is_empty() {
+                println!("Event logs: {}", result.logs.len());
+                for (i, log) in result.logs.iter().enumerate() {
+                    println!("  Log {}: {}", i, log);
+                }
+            }
         }
         Err(e) => {
             println!("Execution failed: {}", e);
@@ -241,6 +247,118 @@ fn main() {
         }
     }
 
+    // Example 8: Event Logging
+    println!("\n8. Event Logging Example:");
+    println!("Code: PUSH1 0x00 PUSH1 0x20 MSTORE PUSH1 0x00 PUSH1 0x20 LOG0 STOP");
+    println!("Expected: Log 32 bytes of memory data with no topics");
+    
+    // LOG0: PUSH1 0x00 PUSH1 0x20 MSTORE PUSH1 0x00 PUSH1 0x20 LOG0 STOP
+    let log_code = Bytes::from(vec![
+        0x60, 0x00, // PUSH1 0x00 (memory offset)
+        0x60, 0x20, // PUSH1 0x20 (value to store)
+        0x52,       // MSTORE (store in memory)
+        0x60, 0x00, // PUSH1 0x00 (log offset)
+        0x60, 0x20, // PUSH1 0x20 (log size)
+        0xa0,       // LOG0
+        0x00        // STOP
+    ]);
+    
+    let context = ExecutionContext::new(
+        Address::zero(),
+        Address::zero(),
+        Uint256::zero(),
+        Bytes::empty(),
+        log_code,
+        1000,
+    );
+    
+    let mut executor = Executor::new(context);
+    match executor.execute() {
+        Ok(result) => {
+            println!("Execution successful: {}", result.success);
+            println!("Gas used: {}", result.gas_used);
+            println!("Gas remaining: {}", result.gas_remaining);
+            if !result.logs.is_empty() {
+                println!("Event logs: {}", result.logs.len());
+                for (i, log) in result.logs.iter().enumerate() {
+                    println!("  Log {}: {}", i, log);
+                }
+            }
+        }
+        Err(e) => {
+            println!("Execution failed: {}", e);
+        }
+    }
+
+    // Example 9: Block Information
+    println!("\n9. Block Information Example:");
+    println!("Code: TIMESTAMP NUMBER CHAINID STOP");
+    println!("Expected: Push current timestamp, block number, and chain ID to stack");
+    
+    // Block info: TIMESTAMP NUMBER CHAINID STOP
+    let block_code = Bytes::from(vec![
+        0x42, // TIMESTAMP
+        0x43, // NUMBER  
+        0x46, // CHAINID
+        0x00  // STOP
+    ]);
+    
+    let context = ExecutionContext::new(
+        Address::zero(),
+        Address::zero(),
+        Uint256::zero(),
+        Bytes::empty(),
+        block_code,
+        1000,
+    );
+    
+    let mut executor = Executor::new(context);
+    match executor.execute() {
+        Ok(result) => {
+            println!("Execution successful: {}", result.success);
+            println!("Gas used: {}", result.gas_used);
+            println!("Gas remaining: {}", result.gas_remaining);
+        }
+        Err(e) => {
+            println!("Execution failed: {}", e);
+        }
+    }
+
+    // Example 10: Advanced Arithmetic Operations
+    println!("\n10. Advanced Arithmetic Example:");
+    println!("Code: PUSH1 0x05 PUSH1 0x03 PUSH1 0x02 ADDMOD STOP");
+    println!("Expected: (5 + 3) mod 2 = 0");
+    
+    // Advanced arithmetic: PUSH1 0x05 PUSH1 0x03 PUSH1 0x02 ADDMOD STOP
+    let advanced_code = Bytes::from(vec![
+        0x60, 0x05, // PUSH1 0x05
+        0x60, 0x03, // PUSH1 0x03
+        0x60, 0x02, // PUSH1 0x02
+        0x08,       // ADDMOD
+        0x00        // STOP
+    ]);
+    
+    let context = ExecutionContext::new(
+        Address::zero(),
+        Address::zero(),
+        Uint256::zero(),
+        Bytes::empty(),
+        advanced_code,
+        1000,
+    );
+    
+    let mut executor = Executor::new(context);
+    match executor.execute() {
+        Ok(result) => {
+            println!("Execution successful: {}", result.success);
+            println!("Gas used: {}", result.gas_used);
+            println!("Gas remaining: {}", result.gas_remaining);
+        }
+        Err(e) => {
+            println!("Execution failed: {}", e);
+        }
+    }
+
     println!("\nEVM demonstration completed!");
     println!("\nThis is an improved implementation of the Ethereum Virtual Machine in Rust.");
     println!("It includes:");
@@ -257,7 +375,9 @@ fn main() {
     println!("\nTo extend this implementation further, you could add:");
     println!("- More opcodes (CALL, CREATE, DELEGATECALL, etc.)");
     println!("- Contract creation and calling");
-    println!("- Event logging");
+    println!("- Event logging (LOG0-LOG4)");
+    println!("- Block and transaction information");
+    println!("- Advanced arithmetic (SDIV, SMOD, ADDMOD, MULMOD, SIGNEXTEND)");
     println!("- More sophisticated gas calculations");
     println!("- Network integration");
     println!("- State management");
