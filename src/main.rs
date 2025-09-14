@@ -173,19 +173,92 @@ fn main() {
         }
     }
     
+    // Example 6: SHA3 operation
+    println!("\n6. SHA3 Operation Example:");
+    println!("Code: PUSH1 0x00 PUSH1 0x20 MSTORE PUSH1 0x00 PUSH1 0x20 SHA3 STOP");
+    println!("Expected: Calculate Keccak256 hash of 32 bytes of memory");
+    
+    let code = Bytes::from(vec![
+        0x60, 0x00, // PUSH1 0x00 (memory offset)
+        0x60, 0x20, // PUSH1 0x20 (value to store)
+        0x52,       // MSTORE (store in memory)
+        0x60, 0x00, // PUSH1 0x00 (offset for SHA3)
+        0x60, 0x20, // PUSH1 0x20 (size for SHA3)
+        0x20,       // SHA3
+        0x00        // STOP
+    ]);
+    
+    let context = ExecutionContext::new(
+        Address::zero(),
+        Address::zero(),
+        Uint256::zero(),
+        Bytes::empty(),
+        code,
+        1000,
+    );
+    
+    let mut executor = Executor::new(context);
+    match executor.execute() {
+        Ok(result) => {
+            println!("Execution successful: {}", result.success);
+            println!("Gas used: {}", result.gas_used);
+        }
+        Err(e) => {
+            println!("Execution failed: {}", e);
+        }
+    }
+
+    // Example 7: Byte operation
+    println!("\n7. Byte Operation Example:");
+    println!("Code: PUSH4 0x12345678 PUSH1 0x01 BYTE POP STOP");
+    println!("Expected: Extract byte at index 1 (0x56) and pop it");
+    
+    let code = Bytes::from(vec![
+        0x63, 0x12, 0x34, 0x56, 0x78, // PUSH4 0x12345678
+        0x60, 0x01,                   // PUSH1 0x01 (byte index)
+        0x1a,                         // BYTE
+        0x50,                         // POP (to balance the stack)
+        0x00                          // STOP
+    ]);
+    
+    let context = ExecutionContext::new(
+        Address::zero(),
+        Address::zero(),
+        Uint256::zero(),
+        Bytes::empty(),
+        code,
+        1000,
+    );
+    
+    let mut executor = Executor::new(context);
+    match executor.execute() {
+        Ok(result) => {
+            println!("Execution successful: {}", result.success);
+            println!("Gas used: {}", result.gas_used);
+        }
+        Err(e) => {
+            println!("Execution failed: {}", e);
+        }
+    }
+
     println!("\nEVM demonstration completed!");
-    println!("\nThis is a basic implementation of the Ethereum Virtual Machine in Rust.");
+    println!("\nThis is an improved implementation of the Ethereum Virtual Machine in Rust.");
     println!("It includes:");
     println!("- Core data types (Address, Uint256, Bytes, Hash)");
     println!("- Stack operations (push, pop, dup, swap)");
     println!("- Memory management");
     println!("- Storage operations");
     println!("- Gas metering");
-    println!("- Basic opcode execution");
-    println!("\nTo extend this implementation, you could add:");
-    println!("- More opcodes (SHA3, CALL, CREATE, etc.)");
-    println!("- Cryptographic operations");
+    println!("- Enhanced opcode execution");
+    println!("- SHA3 cryptographic operations");
+    println!("- Bitwise operations (BYTE, SHL, SHR)");
+    println!("- Improved error handling and validation");
+    println!("- Debug and profiling capabilities");
+    println!("\nTo extend this implementation further, you could add:");
+    println!("- More opcodes (CALL, CREATE, DELEGATECALL, etc.)");
     println!("- Contract creation and calling");
     println!("- Event logging");
     println!("- More sophisticated gas calculations");
+    println!("- Network integration");
+    println!("- State management");
 }

@@ -7,6 +7,7 @@ use crate::{
     opcodes::{Opcode, OpcodeError},
 };
 use thiserror::Error;
+use sha3::{Digest, Keccak256};
 
 #[derive(Error, Debug)]
 pub enum ExecutionError {
@@ -143,8 +144,16 @@ impl Executor {
 
     /// Execute a single step
     pub fn step(&mut self) -> Result<(), ExecutionError> {
+        // Check if we're out of bounds
+        if self.context.pc >= self.context.code.len() {
+            return Err(ExecutionError::InvalidInstruction("Program counter out of bounds".to_string()));
+        }
+
         let opcode_byte = self.context.current_instruction()?;
         let opcode = Opcode::from_byte(opcode_byte)?;
+
+        // Validate stack requirements
+        self.validate_stack_requirements(&opcode)?;
 
         // Handle push opcodes specially
         if opcode.is_push() {
@@ -153,6 +162,21 @@ impl Executor {
             self.execute_opcode(opcode)?;
         }
 
+        Ok(())
+    }
+
+    /// Validate stack requirements for an opcode
+    fn validate_stack_requirements(&self, opcode: &Opcode) -> Result<(), ExecutionError> {
+        let required_items = opcode.pop_count();
+        if self.context.stack.size() < required_items {
+            return Err(ExecutionError::Stack(StackError::Underflow));
+        }
+        
+        let max_stack_size = self.context.stack.max_size();
+        if opcode.is_push() && self.context.stack.size() >= max_stack_size {
+            return Err(ExecutionError::Stack(StackError::Overflow));
+        }
+        
         Ok(())
     }
 
@@ -256,6 +280,20 @@ impl Executor {
                 let result = if a > b { Uint256::one() } else { Uint256::zero() };
                 self.context.stack.push(result)?;
             }
+            Opcode::Slt => {
+                // Signed less than (simplified implementation)
+                let a = self.context.stack.pop()?;
+                let b = self.context.stack.pop()?;
+                let result = if a < b { Uint256::one() } else { Uint256::zero() };
+                self.context.stack.push(result)?;
+            }
+            Opcode::Sgt => {
+                // Signed greater than (simplified implementation)
+                let a = self.context.stack.pop()?;
+                let b = self.context.stack.pop()?;
+                let result = if a > b { Uint256::one() } else { Uint256::zero() };
+                self.context.stack.push(result)?;
+            }
             Opcode::Eq => {
                 let a = self.context.stack.pop()?;
                 let b = self.context.stack.pop()?;
@@ -287,11 +325,59 @@ impl Executor {
                 let result = a ^ b;
                 self.context.stack.push(result)?;
             }
+            Opcode::Byte => {
+                let i = self.context.stack.pop()?;
+                let x = self.context.stack.pop()?;
+                let result = if i >= Uint256::from_u32(32) {
+                    Uint256::zero()
+                } else {
+                    let byte_index = i.to_u32() as usize;
+                    let bytes = x.to_bytes_be();
+                    Uint256::from_u8(bytes[byte_index])
+                };
+                self.context.stack.push(result)?;
+            }
+            Opcode::Shl => {
+                let shift = self.context.stack.pop()?;
+                let value = self.context.stack.pop()?;
+                let result = if shift >= Uint256::from_u32(256) {
+                    Uint256::zero()
+                } else {
+                    value << (shift.to_u32() as usize)
+                };
+                self.context.stack.push(result)?;
+            }
+            Opcode::Shr => {
+                let shift = self.context.stack.pop()?;
+                let value = self.context.stack.pop()?;
+                let result = if shift >= Uint256::from_u32(256) {
+                    Uint256::zero()
+                } else {
+                    value >> (shift.to_u32() as usize)
+                };
+                self.context.stack.push(result)?;
+            }
             Opcode::Not => {
                 let a = self.context.stack.pop()?;
                 // NOT operation on 256-bit value (bitwise complement)
                 let max_uint256 = Uint256::from_bytes_be(&[0xFF; 32]);
                 let result = a ^ max_uint256;
+                self.context.stack.push(result)?;
+            }
+
+            // SHA3 operation
+            Opcode::Sha3 => {
+                let offset = self.context.stack.pop()?;
+                let size = self.context.stack.pop()?;
+                let offset_usize = offset.to_u64() as usize;
+                let size_usize = size.to_u64() as usize;
+                
+                // Read data from memory
+                let data = self.context.memory.read_bytes(offset_usize, size_usize)?;
+                
+                // Calculate Keccak256 hash
+                let hash = Keccak256::digest(&data);
+                let result = Uint256::from_bytes_be(&hash);
                 self.context.stack.push(result)?;
             }
 
@@ -376,6 +462,30 @@ impl Executor {
             Opcode::Codesize => {
                 let size = Uint256::from_u32(self.context.code.len() as u32);
                 self.context.stack.push(size)?;
+            }
+            Opcode::Codecopy => {
+                let dest_offset = self.context.stack.pop()?;
+                let offset = self.context.stack.pop()?;
+                let size = self.context.stack.pop()?;
+                let dest_offset_usize = dest_offset.to_u64() as usize;
+                let offset_usize = offset.to_u64() as usize;
+                let size_usize = size.to_u64() as usize;
+                
+                if offset_usize < self.context.code.len() {
+                    let end = (offset_usize + size_usize).min(self.context.code.len());
+                    let data = &self.context.code.as_slice()[offset_usize..end];
+                    self.context.memory.write_bytes(dest_offset_usize, data)?;
+                }
+            }
+            Opcode::Balance => {
+                let address_bytes = self.context.stack.pop()?;
+                let address_bytes_array = address_bytes.to_bytes_be();
+                let address_slice = &address_bytes_array[12..]; // Take last 20 bytes
+                let mut address_array = [0u8; 20];
+                address_array.copy_from_slice(address_slice);
+                let address = Address::new(address_array);
+                let balance = self.context.storage.get_balance(&address);
+                self.context.stack.push(balance)?;
             }
 
             // Control flow

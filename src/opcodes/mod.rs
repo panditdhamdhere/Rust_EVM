@@ -17,7 +17,7 @@ pub enum OpcodeError {
 }
 
 /// EVM opcodes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Opcode {
     // Stop and arithmetic operations
     Stop = 0x00,

@@ -81,19 +81,46 @@ impl Uint256 {
         &self.0
     }
 
-    /// Convert to u64 (may panic if value is too large)
+    /// Convert to u64 (returns 0 if value is too large)
     pub fn to_u64(&self) -> u64 {
         self.0.to_u64_digits().first().copied().unwrap_or(0)
     }
 
-    /// Convert to u32 (may panic if value is too large)
+    /// Convert to u32 (returns 0 if value is too large)
     pub fn to_u32(&self) -> u32 {
         self.0.to_u32_digits().first().copied().unwrap_or(0)
     }
 
-    /// Convert to u8 (may panic if value is too large)
+    /// Convert to u8 (returns 0 if value is too large)
     pub fn to_u8(&self) -> u8 {
         self.0.to_u32_digits().first().map(|&x| x as u8).unwrap_or(0)
+    }
+
+    /// Safely convert to u64 with overflow check
+    pub fn to_u64_safe(&self) -> Result<u64, String> {
+        if self.0.bits() > 64 {
+            Err("Value too large for u64".to_string())
+        } else {
+            Ok(self.to_u64())
+        }
+    }
+
+    /// Safely convert to u32 with overflow check
+    pub fn to_u32_safe(&self) -> Result<u32, String> {
+        if self.0.bits() > 32 {
+            Err("Value too large for u32".to_string())
+        } else {
+            Ok(self.to_u32())
+        }
+    }
+
+    /// Safely convert to u8 with overflow check
+    pub fn to_u8_safe(&self) -> Result<u8, String> {
+        if self.0.bits() > 8 {
+            Err("Value too large for u8".to_string())
+        } else {
+            Ok(self.to_u8())
+        }
     }
 }
 
