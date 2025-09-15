@@ -9,5 +9,8 @@ pub mod debug;
 pub mod events;
 pub mod block;
 pub mod cli;
+pub mod validation;
+pub mod tracing;
+pub mod advanced;
 
 pub use types::*;
