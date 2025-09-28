@@ -674,15 +674,175 @@ impl Cli {
     }
     
     /// Run interactive shell
-    fn run_shell_static(_gas_limit: u64) -> Result<(), Box<dyn std::error::Error>> {
+    fn run_shell_static(gas_limit: u64) -> Result<(), Box<dyn std::error::Error>> {
         println!("🐚 EVM Interactive Shell");
         println!("=======================");
         println!("Type 'help' for commands, 'exit' to quit");
         println!();
         
-        // TODO: Implement interactive shell
-        println!("Interactive shell not yet implemented.");
-        println!("Use 'evm-rust execute --code <hex>' to run bytecode.");
+        use std::io::{self, Write};
+        
+        loop {
+            print!("evm> ");
+            io::stdout().flush()?;
+            
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            let input = input.trim();
+            
+            if input.is_empty() {
+                continue;
+            }
+            
+            match input {
+                "exit" | "quit" => {
+                    println!("👋 Goodbye!");
+                    break;
+                }
+                "help" => {
+                    Self::show_shell_help();
+                }
+                "clear" => {
+                    print!("\x1B[2J\x1B[1;1H");
+                }
+                "info" => {
+                    println!("ℹ️  Current Context:");
+                    println!("  Gas Limit: {}", gas_limit);
+                    println!("  Shell Version: 0.1.0");
+                }
+                input if input.starts_with("run ") => {
+                    let code = input.strip_prefix("run ").unwrap_or("");
+                    if let Err(e) = Self::execute_shell_code(code, gas_limit) {
+                        println!("❌ Execution error: {}", e);
+                    }
+                }
+                input if input.starts_with("analyze ") => {
+                    let code = input.strip_prefix("analyze ").unwrap_or("");
+                    if let Err(e) = Self::analyze_shell_code(code) {
+                        println!("❌ Analysis error: {}", e);
+                    }
+                }
+                input if input.starts_with("optimize ") => {
+                    let code = input.strip_prefix("optimize ").unwrap_or("");
+                    if let Err(e) = Self::optimize_shell_code(code) {
+                        println!("❌ Optimization error: {}", e);
+                    }
+                }
+                _ => {
+                    println!("❓ Unknown command: '{}'", input);
+                    println!("   Type 'help' for available commands.");
+                }
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Show shell help
+    fn show_shell_help() {
+        println!("📖 Available Commands:");
+        println!("===================");
+        println!("  run <bytecode>     - Execute EVM bytecode (hex)");
+        println!("  analyze <bytecode> - Analyze contract bytecode");
+        println!("  optimize <bytecode>- Optimize bytecode for gas efficiency");
+        println!("  info               - Show current shell context");
+        println!("  clear              - Clear the screen");
+        println!("  help               - Show this help message");
+        println!("  exit/quit          - Exit the shell");
+        println!();
+        println!("Examples:");
+        println!("  run 6002600301     - Execute PUSH1 2 PUSH1 3 ADD");
+        println!("  analyze 6002600301 - Analyze the bytecode");
+        println!("  optimize 6002600301- Optimize the bytecode");
+    }
+    
+    /// Execute bytecode in shell
+    fn execute_shell_code(code: &str, gas_limit: u64) -> Result<(), Box<dyn std::error::Error>> {
+        if code.is_empty() {
+            println!("❌ No bytecode provided");
+            return Ok(());
+        }
+        
+        // Parse bytecode
+        let code_bytes = if code.starts_with("0x") {
+            hex::decode(&code[2..])?
+        } else {
+            hex::decode(code)?
+        };
+        
+        // Create execution context
+        let context = ExecutionContext::new(
+            Address::zero(),
+            Address::zero(),
+            Uint256::zero(),
+            Bytes::empty(),
+            Bytes::from(code_bytes),
+            gas_limit,
+        );
+        
+        // Execute
+        let mut executor = Executor::new(context);
+        let result = executor.execute()?;
+        
+        // Display results
+        println!("📊 Execution Results:");
+        println!("  Success: {}", result.success);
+        println!("  Gas Used: {}", result.gas_used);
+        println!("  Gas Remaining: {}", result.gas_remaining);
+        
+        if !result.return_data.is_empty() {
+            println!("  Return Data: 0x{}", hex::encode(result.return_data.as_slice()));
+        }
+        
+        if !result.logs.is_empty() {
+            println!("  Event Logs: {}", result.logs.len());
+        }
+        
+        Ok(())
+    }
+    
+    /// Analyze bytecode in shell
+    fn analyze_shell_code(code: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if code.is_empty() {
+            println!("❌ No bytecode provided");
+            return Ok(());
+        }
+        
+        let bytecode = if code.starts_with("0x") {
+            hex::decode(&code[2..])?
+        } else {
+            hex::decode(code)?
+        };
+        
+        let analyzer = ContractAnalyzer::new();
+        let analysis = analyzer.analyze(&bytecode);
+        
+        println!("{}", analysis);
+        Ok(())
+    }
+    
+    /// Optimize bytecode in shell
+    fn optimize_shell_code(code: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if code.is_empty() {
+            println!("❌ No bytecode provided");
+            return Ok(());
+        }
+        
+        let bytecode = if code.starts_with("0x") {
+            hex::decode(&code[2..])?
+        } else {
+            hex::decode(code)?
+        };
+        
+        let optimizer = GasOptimization::new();
+        let optimized = optimizer.optimize(&bytecode)?;
+        
+        println!("📥 Original: {} bytes - 0x{}", bytecode.len(), hex::encode(&bytecode));
+        println!("📤 Optimized: {} bytes - 0x{}", optimized.len(), hex::encode(&optimized));
+        println!("💾 Size reduction: {} bytes ({:.1}%)", 
+            bytecode.len() - optimized.len(),
+            ((bytecode.len() - optimized.len()) as f64 / bytecode.len() as f64) * 100.0
+        );
         
         Ok(())
     }
