@@ -145,6 +145,11 @@ impl Executor {
             self.step()?;
         }
 
+        // If we reached the end of code without explicit halt, consider it successful
+        if self.context.should_continue && self.context.pc >= self.context.code.len() {
+            self.context.success = true;
+        }
+
         Ok(ExecutionResult {
             success: self.context.success,
             return_data: self.context.return_data.clone(),

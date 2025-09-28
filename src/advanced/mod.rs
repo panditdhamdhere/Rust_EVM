@@ -1,8 +1,6 @@
 use crate::{
-    types::{Address, Uint256, Bytes, Hash},
     opcodes::Opcode,
-    executor::{ExecutionContext, ExecutionResult},
-    gas::GasMeter,
+    executor::ExecutionResult,
 };
 use std::collections::HashMap;
 use std::fmt;

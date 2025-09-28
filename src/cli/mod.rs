@@ -310,7 +310,7 @@ impl Cli {
             Bytes::from(code_bytes),
             gas_limit,
         );
-        
+         
         // Create tracer if tracing is enabled
         let tracer = if detailed_trace || export_trace.is_some() {
             Some(ExecutionTracer::new())
