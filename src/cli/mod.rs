@@ -311,16 +311,19 @@ impl Cli {
             gas_limit,
         );
          
-        // Create tracer if tracing is enabled
-        let tracer = if detailed_trace || export_trace.is_some() {
-            Some(ExecutionTracer::new())
+        // Execute with or without tracer
+        let (result, execution_trace) = if detailed_trace || export_trace.is_some() {
+            let tracer = ExecutionTracer::new();
+            let mut executor = Executor::new_with_tracer(context, tracer);
+            let result = executor.execute()?;
+            let tracer = executor.take_tracer().unwrap();
+            let execution_trace = tracer.finalize(result.success, result.gas_used);
+            (result, Some(execution_trace))
         } else {
-            None
+            let mut executor = Executor::new(context);
+            let result = executor.execute()?;
+            (result, None)
         };
-        
-        // Execute
-        let mut executor = Executor::new(context);
-        let result = executor.execute()?;
         
         // Display results
         println!("📊 Execution Results:");
@@ -340,9 +343,7 @@ impl Cli {
         }
         
         // Handle tracing
-        if let Some(tracer) = tracer {
-            let execution_trace = tracer.finalize(result.success, result.gas_used);
-            
+        if let Some(execution_trace) = execution_trace {
             if detailed_trace {
                 println!("\n📈 Execution Trace:");
                 println!("==================");

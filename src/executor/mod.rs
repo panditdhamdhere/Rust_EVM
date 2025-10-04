@@ -7,6 +7,7 @@ use crate::{
     opcodes::{Opcode, OpcodeError},
     events::{EventLogger, EventLog},
     block::{BlockContext, TransactionContext},
+    tracing::{ExecutionTracer, ExecutionStep},
 };
 use thiserror::Error;
 use sha3::{Digest, Keccak256};
@@ -131,12 +132,25 @@ impl ExecutionContext {
 pub struct Executor {
     /// Execution context
     context: ExecutionContext,
+    /// Optional execution tracer
+    tracer: Option<ExecutionTracer>,
 }
 
 impl Executor {
     /// Create a new executor
     pub fn new(context: ExecutionContext) -> Self {
-        Executor { context }
+        Executor { 
+            context,
+            tracer: None,
+        }
+    }
+
+    /// Create a new executor with tracer
+    pub fn new_with_tracer(context: ExecutionContext, tracer: ExecutionTracer) -> Self {
+        Executor { 
+            context,
+            tracer: Some(tracer),
+        }
     }
 
     /// Execute the EVM code
@@ -159,6 +173,11 @@ impl Executor {
         })
     }
 
+    /// Take the tracer from the executor (consumes the tracer)
+    pub fn take_tracer(&mut self) -> Option<ExecutionTracer> {
+        self.tracer.take()
+    }
+
     /// Execute a single step
     pub fn step(&mut self) -> Result<(), ExecutionError> {
         // Check if we're out of bounds
@@ -169,6 +188,15 @@ impl Executor {
         let opcode_byte = self.context.current_instruction()?;
         let opcode = Opcode::from_byte(opcode_byte)?;
 
+        // Capture stack state before execution for tracing
+        let stack_before = if self.tracer.is_some() {
+            self.context.stack.items().to_vec()
+        } else {
+            Vec::new()
+        };
+
+        let gas_before = self.context.gas_meter.available();
+
         // Validate stack requirements
         self.validate_stack_requirements(&opcode)?;
 
@@ -177,6 +205,25 @@ impl Executor {
             self.execute_push(opcode)?;
         } else {
             self.execute_opcode(opcode)?;
+        }
+
+        // Record execution step if tracer is present
+        if let Some(ref mut tracer) = self.tracer {
+            let stack_after = self.context.stack.items().to_vec();
+            let gas_after = self.context.gas_meter.available();
+            let gas_consumed = gas_before - gas_after;
+
+            let step = ExecutionStep::new(
+                self.context.pc.saturating_sub(1), // PC was advanced during execution
+                opcode,
+                stack_before,
+                stack_after,
+                gas_consumed,
+                gas_after,
+                0, // depth - we'll implement this later for calls
+            );
+
+            tracer.add_step(step);
         }
 
         Ok(())
